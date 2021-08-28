@@ -1,30 +1,51 @@
 const Koa = require("koa");
 const KoaRouter = require("koa-router");
 const KoaJson = require("koa-json");
-const path = require("path");
-const render = require("koa-ejs");
 const bodyParser = require("koa-bodyparser");
+const JWT = require("jsonwebtoken");
+const sqlServer = require("mssql");
+const bcrypt = require("bcrypt");
+
+// process.env will be added late
+const saltRounds = 10;
+
+// database config
+const dbConfig = {
+  server: "DESKTOP-MI4F2T1",
+  database: "KOATesting",
+  user: "sa",
+  password: "123",
+  trustServerCertificate: true
+};
 
 const app = new Koa();
 const router = new KoaRouter();
 
-render(app, {
-  root: path.join(__dirname, "views"),
-  layout: "layout",
-  viewExt: "html",
-  cache: false,
-  debug: false
-});
+// bodyParser to see the request body
+app.use(bodyParser());
+// make your json looks better
+app.use(KoaJson());
+// config routes
+app.use(router.routes()).use(router.allowedMethods());
 
 // Index
-router.get("/", async (ctx) => {
-  await ctx.render("index");
-});
+router.post("/register", register);
 
-// Jason middleware
-app.use(KoaJson());
-// Router middleware
-app.use(router.routes()).use(router.allowedMethods());
+// register using email and password
+async function register(ctx) {
+  const data = ctx.request.body;
+  console.log(ctx.request.body);
+  await sqlServer.connect(dbConfig);
+  // hash error not handled
+  bcrypt.hash(data.password, saltRounds, function (err, hash) {
+    try {
+      sqlServer.query`Insert into [user](email, hashedPassword, created_time) values (${data.email}, ${hash},${data.create_time})`;
+    } catch (err) {
+      ctx.response.body = err.message;
+    }
+  });
+  ctx.response.body = "user created";
+}
 
 //app.use(async (ctx) => (ctx.body = { msg: "我的很大， 你忍一下" }));
 
